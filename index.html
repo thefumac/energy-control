@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISO 50001 에너지 관리 대시보드</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Modal background */
+        .modal-bg {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+    <!-- SheetJS CDN for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-10">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
+            <h1 class="text-3xl font-extrabold text-gray-900">에너지 관리 대시보드</h1>
+            <div class="mt-4 md:mt-0 flex flex-wrap gap-2">
+                <button id="addRecordBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    기록 추가
+                </button>
+                <button id="configAspectsBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-.66-1.1-1.36-2.03-1.36-1.04 0-1.63.7-2.02 1.36-.26.43-.13.91.24 1.34.37.43.91.56 1.35.29.39-.24.78-.49 1.15-.49.37 0 .76.25 1.15.49.44.27.98.14 1.35-.29.37-.43.5-.91.24-1.34zM10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd" />
+                    </svg>
+                    측면 설정
+                </button>
+                <button id="exportExcelBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-9.293a1 1 0 011.414 0L10 9.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414zM10 2a1 1 0 011 1v8a1 1 0 11-2 0V3a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    엑셀 내보내기
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="records-container">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">전체 에너지 기록</h2>
+            <div class="overflow-x-auto rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기록ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">장소</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기기</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">에너지 종류</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용량</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">단위</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기록일</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Records will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="noRecordsMsg" class="mt-4 text-center text-gray-500 hidden">
+                저장된 에너지 기록이 없습니다.
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Add Record Modal -->
+    <div id="addRecordModal" class="modal-bg fixed inset-0 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 w-11/12 md:w-1/2 max-w-lg">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">에너지 사용 기록 추가</h3>
+            <form id="addRecordForm">
+                <div class="mb-4">
+                    <label for="aspectSelect" class="block text-gray-700 font-medium mb-1">에너지 측면 선택:</label>
+                    <select id="aspectSelect" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300">
+                        <!-- Options will be dynamically added here -->
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="usageAmount" class="block text-gray-700 font-medium mb-1">사용량:</label>
+                    <input type="number" id="usageAmount" step="0.01" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300" placeholder="사용량 (숫자)">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" id="closeAddRecordModal" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">취소</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">기록 추가</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Configure Aspects Modal -->
+    <div id="configAspectsModal" class="modal-bg fixed inset-0 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 w-11/12 md:w-1/2 max-w-lg">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">에너지 측면 설정</h3>
+            <form id="configAspectsForm">
+                <div class="mb-4">
+                    <label for="locationInput" class="block text-gray-700 font-medium mb-1">장소:</label>
+                    <input type="text" id="locationInput" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300" placeholder="예: 공장동A">
+                </div>
+                <div class="mb-4">
+                    <label for="deviceInput" class="block text-gray-700 font-medium mb-1">기기:</label>
+                    <input type="text" id="deviceInput" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300" placeholder="예: 프레스1호기">
+                </div>
+                <div class="mb-4">
+                    <label for="energyTypeInput" class="block text-gray-700 font-medium mb-1">에너지 종류:</label>
+                    <input type="text" id="energyTypeInput" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300" placeholder="예: 전기">
+                </div>
+                <div class="mb-4">
+                    <label for="unitInput" class="block text-gray-700 font-medium mb-1">단위:</label>
+                    <input type="text" id="unitInput" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300" placeholder="예: kWh">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" id="closeConfigAspectsModal" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">취소</button>
+                    <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">측면 설정</button>
+                </div>
+            </form>
+            <div id="aspectsList" class="mt-6 p-4 bg-gray-100 rounded-lg overflow-y-auto max-h-48">
+                <h4 class="font-semibold text-gray-700 mb-2">설정된 측면 목록:</h4>
+                <ul id="aspectsUl" class="list-disc list-inside space-y-1">
+                    <!-- Configured aspects will be dynamically added here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div id="messageBox" class="fixed bottom-4 right-4 p-4 rounded-lg text-white font-bold shadow-xl transition-transform transform translate-y-20 duration-300 z-50"></div>
+
+    <script>
+        // --- Data Structures (JavaScript equivalents of Java classes) ---
+
+        // A simple counter for generating unique IDs for aspects and records.
+        let nextAspectId = 1;
+        let nextRecordId = 1;
+
+        // In-memory "database" to store our data.
+        let aspects = {}; // Using an object for quick ID lookup, similar to a Map
+        let records = []; // Using an array for chronological storage
+
+        // --- Mock Data for demonstration ---
+        function initializeMockData() {
+            // Mock aspects
+            const aspect1 = { id: nextAspectId++, location: "공장동A", device: "프레스1호기", energyType: "전기", unit: "kWh" };
+            const aspect2 = { id: nextAspectId++, location: "사무동B", device: "냉난방기", energyType: "전기", unit: "kWh" };
+            const aspect3 = { id: nextAspectId++, location: "공장동A", device: "보일러", energyType: "가스", unit: "MWh" };
+            aspects[aspect1.id] = aspect1;
+            aspects[aspect2.id] = aspect2;
+            aspects[aspect3.id] = aspect3;
+
+            // Mock records
+            records.push({ id: nextRecordId++, aspectId: aspect1.id, usageAmount: 125.5, recordDate: new Date("2024-07-01T10:00:00") });
+            records.push({ id: nextRecordId++, aspectId: aspect2.id, usageAmount: 35.2, recordDate: new Date("2024-07-01T10:30:00") });
+            records.push({ id: nextRecordId++, aspectId: aspect1.id, usageAmount: 130.1, recordDate: new Date("2024-07-02T09:00:00") });
+            records.push({ id: nextRecordId++, aspectId: aspect3.id, usageAmount: 2.7, recordDate: new Date("2024-07-03T11:00:00") });
+        }
+        initializeMockData();
+
+
+        // --- UI Element References ---
+        const addRecordBtn = document.getElementById('addRecordBtn');
+        const configAspectsBtn = document.getElementById('configAspectsBtn');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const addRecordModal = document.getElementById('addRecordModal');
+        const configAspectsModal = document.getElementById('configAspectsModal');
+        const closeAddRecordModal = document.getElementById('closeAddRecordModal');
+        const closeConfigAspectsModal = document.getElementById('closeConfigAspectsModal');
+        const addRecordForm = document.getElementById('addRecordForm');
+        const configAspectsForm = document.getElementById('configAspectsForm');
+        const recordsTableBody = document.getElementById('recordsTableBody');
+        const aspectSelect = document.getElementById('aspectSelect');
+        const aspectsUl = document.getElementById('aspectsUl');
+        const noRecordsMsg = document.getElementById('noRecordsMsg');
+        const messageBox = document.getElementById('messageBox');
+
+
+        // --- Core Application Logic Functions ---
+
+        /**
+         * Renders the table of all energy records, sorted by date.
+         */
+        function renderRecordsTable() {
+            // Sort records by date in ascending order
+            records.sort((a, b) => a.recordDate - b.recordDate);
+
+            if (records.length === 0) {
+                recordsTableBody.innerHTML = '';
+                noRecordsMsg.classList.remove('hidden');
+                return;
+            }
+
+            noRecordsMsg.classList.add('hidden');
+            recordsTableBody.innerHTML = ''; // Clear existing rows
+
+            records.forEach(record => {
+                const aspect = aspects[record.aspectId];
+                if (aspect) {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-100 transition duration-150';
+                    const formattedDate = new Date(record.recordDate).toLocaleString('ko-KR', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: false // 24-hour format
+                    });
+
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${record.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${aspect.location}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${aspect.device}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${aspect.energyType}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.usageAmount.toFixed(2)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${aspect.unit}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedDate}</td>
+                    `;
+                    recordsTableBody.appendChild(row);
+                }
+            });
+        }
+
+        /**
+         * Renders the select dropdown with available energy aspects.
+         */
+        function renderAspectSelect() {
+            aspectSelect.innerHTML = ''; // Clear existing options
+            const aspectsArray = Object.values(aspects);
+
+            if (aspectsArray.length === 0) {
+                aspectSelect.innerHTML = '<option value="" disabled selected>먼저 측면을 설정해주세요</option>';
+                return;
+            }
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.disabled = true;
+            defaultOption.selected = true;
+            defaultOption.textContent = "에너지 측면을 선택하세요";
+            aspectSelect.appendChild(defaultOption);
+
+            aspectsArray.forEach(aspect => {
+                const option = document.createElement('option');
+                option.value = aspect.id;
+                option.textContent = `${aspect.location} - ${aspect.device} (${aspect.energyType}, ${aspect.unit})`;
+                aspectSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * Renders the list of configured aspects in the modal.
+         */
+        function renderAspectsList() {
+            aspectsUl.innerHTML = '';
+            const aspectsArray = Object.values(aspects);
+            if (aspectsArray.length === 0) {
+                aspectsUl.innerHTML = '<li class="text-gray-500">설정된 측면이 없습니다.</li>';
+                return;
+            }
+            aspectsArray.forEach(aspect => {
+                const li = document.createElement('li');
+                li.textContent = `ID ${aspect.id}: ${aspect.location} - ${aspect.device} (${aspect.energyType}, ${aspect.unit})`;
+                aspectsUl.appendChild(li);
+            });
+        }
+
+        /**
+         * Displays a temporary message box for user feedback.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'success' or 'error' to change color.
+         */
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'fixed bottom-4 right-4 p-4 rounded-lg text-white font-bold shadow-xl transition-transform transform -translate-y-0 duration-300 z-50';
+            messageBox.style.backgroundColor = type === 'success' ? '#10B981' : '#EF4444';
+            setTimeout(() => {
+                messageBox.classList.remove('-translate-y-0');
+                messageBox.classList.add('translate-y-20');
+            }, 3000); // Hide after 3 seconds
+        }
+
+        /**
+         * Exports the records data to an Excel (.xlsx) file.
+         */
+        function exportToExcel() {
+            if (records.length === 0) {
+                showMessage('내보낼 데이터가 없습니다.', 'error');
+                return;
+            }
+
+            // Create a formatted array of data to export
+            const dataToExport = records.map(record => {
+                const aspect = aspects[record.aspectId];
+                const formattedDate = new Date(record.recordDate).toLocaleString('ko-KR', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hour12: false
+                });
+
+                return {
+                    '기록ID': record.id,
+                    '장소': aspect ? aspect.location : '알 수 없음',
+                    '기기': aspect ? aspect.device : '알 수 없음',
+                    '에너지 종류': aspect ? aspect.energyType : '알 수 없음',
+                    '사용량': record.usageAmount,
+                    '단위': aspect ? aspect.unit : '알 수 없음',
+                    '기록일': formattedDate
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "에너지 사용 기록");
+
+            const date = new Date();
+            const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}${String(date.getSeconds()).padStart(2, '0')}`;
+            const fileName = `energy_records_${dateStr}.xlsx`;
+
+            XLSX.writeFile(wb, fileName);
+            showMessage('엑셀 파일이 성공적으로 내보내졌습니다.', 'success');
+        }
+
+
+        // --- Event Listeners for UI Interactions ---
+
+        // Open/Close Modals
+        addRecordBtn.addEventListener('click', () => {
+            if (Object.keys(aspects).length === 0) {
+                showMessage('먼저 에너지 측면을 설정해주세요.', 'error');
+                return;
+            }
+            renderAspectSelect();
+            addRecordModal.classList.remove('hidden');
+        });
+        closeAddRecordModal.addEventListener('click', () => addRecordModal.classList.add('hidden'));
+
+        configAspectsBtn.addEventListener('click', () => {
+            renderAspectsList();
+            configAspectsModal.classList.remove('hidden');
+        });
+        closeConfigAspectsModal.addEventListener('click', () => configAspectsModal.classList.add('hidden'));
+        
+        // Export to Excel Button
+        exportExcelBtn.addEventListener('click', exportToExcel);
+
+
+        // Form Submissions
+        addRecordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const aspectId = parseInt(aspectSelect.value);
+            const usageAmount = parseFloat(document.getElementById('usageAmount').value);
+
+            if (!aspectId || isNaN(usageAmount) || usageAmount < 0) {
+                showMessage('유효한 값을 입력해 주세요.', 'error');
+                return;
+            }
+
+            const newRecord = {
+                id: nextRecordId++,
+                aspectId: aspectId,
+                usageAmount: usageAmount,
+                recordDate: new Date()
+            };
+            records.push(newRecord);
+
+            addRecordModal.classList.add('hidden');
+            document.getElementById('usageAmount').value = '';
+            renderRecordsTable();
+            showMessage('새로운 기록이 추가되었습니다.', 'success');
+        });
+
+        configAspectsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const location = document.getElementById('locationInput').value.trim();
+            const device = document.getElementById('deviceInput').value.trim();
+            const energyType = document.getElementById('energyTypeInput').value.trim();
+            const unit = document.getElementById('unitInput').value.trim();
+
+            if (!location || !device || !energyType || !unit) {
+                showMessage('모든 필드를 채워주세요.', 'error');
+                return;
+            }
+
+            const newAspect = {
+                id: nextAspectId++,
+                location,
+                device,
+                energyType,
+                unit
+            };
+            aspects[newAspect.id] = newAspect;
+
+            document.getElementById('locationInput').value = '';
+            document.getElementById('deviceInput').value = '';
+            document.getElementById('energyTypeInput').value = '';
+            document.getElementById('unitInput').value = '';
+            renderAspectsList();
+            renderAspectSelect(); // Update the dropdown for records
+            showMessage('새로운 에너지 측면이 설정되었습니다.', 'success');
+        });
+
+        // Initial render on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRecordsTable();
+            renderAspectSelect();
+            renderAspectsList(); // This is for the modal, but good to have
+        });
+
+    </script>
+
+</body>
+</html>
